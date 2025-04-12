@@ -5,11 +5,34 @@ import { zoom } from "d3-zoom";
 import { select } from "d3-selection";
 import { MapGroupSvg, slotsGroupSvg } from "./constant";
 import "d3-transition";
+import { createClient } from "@/utils/supabase/client";
+import { useRouter } from "next/navigation";
 
 export default function Map() {
-  const [selectedSlot, setSelectedSlot] = useState(null);
+  const router = useRouter();
+  const supabase = createClient();
+
   const svgRef = useRef(null);
   const gRef = useRef(null);
+
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [bookedSlots, setBookedSlots] = useState([]);
+
+  useEffect(() => {
+    const fetchBooked = async () => {
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("slot_index");
+      if (data) setBookedSlots(data.map((item) => item.slot_index));
+    };
+    fetchBooked();
+  }, []);
+
+  const handleSlotClick = (index) => {
+    if (bookedSlots.includes(index)) return;
+    setSelectedSlot(index);
+    router.push(`/protected/book-slot?slot=${index}`);
+  };
 
   useEffect(() => {
     const svg = select(svgRef.current);
@@ -23,10 +46,6 @@ export default function Map() {
 
     svg.call(zoomBehavior);
   }, []);
-
-  const handleSlotClick = (index) => {
-    setSelectedSlot((prev) => (prev === index ? null : index));
-  };
 
   return (
     <div className="flex-1 ">
@@ -42,20 +61,26 @@ export default function Map() {
         <rect width="632" height="701" fill="#ffffff" />
         <g ref={gRef}>
           <g id="slots">
-            {slotsGroupSvg.map((slot, index) => (
-              <path
-                key={index}
-                d={slot}
-                fill={index === selectedSlot ? "#10B981" : "#A3A3A3"}
-                stroke={index === selectedSlot ? "#10B951" : "none"}
-                strokeWidth={index === selectedSlot ? 1 : 0}
-                cursor="pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSlotClick(index);
-                }}
-              />
-            ))}
+            {slotsGroupSvg.map((slot, index) => {
+              const isBooked = bookedSlots.includes(index);
+              const isSelected = index === selectedSlot;
+              return (
+                <path
+                  key={index}
+                  d={slot}
+                  fill={
+                    isBooked ? "#EF4444" : isSelected ? "#10B981" : "#A3A3A3"
+                  }
+                  stroke={isSelected ? "#10B951" : "none"}
+                  strokeWidth={isSelected ? 1 : 0}
+                  cursor={isBooked ? "not-allowed" : "pointer"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSlotClick(index);
+                  }}
+                />
+              );
+            })}
           </g>
           {MapGroupSvg}
         </g>
